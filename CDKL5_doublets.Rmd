@@ -1,0 +1,298 @@
+---
+title: "CDKL5_doublets"
+author: "Javier Villegas"
+date: "2025-01-27"
+output: html_document
+---
+
+
+```{r setup, include=FALSE}
+set.seed(seed = 42)
+library(Seurat)
+library(tidyverse)
+library(DoubletFinder)
+options(future.globals.maxSize = 6000 * 1024^2)
+#Creating the output folder in case it's not there 
+# output_dir <- paste0(getwd(),"/output/")
+#     if (!dir.exists(output_dir)) {
+#       dir.create(output_dir, recursive = T)
+#     }
+```
+
+
+
+
+```{r DoubletFinder}
+#Loading precreated file
+# 
+OM_seurat_prefiltered_1st <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/QC/OM_seurat_1st.rds")
+OM_seurat_prefiltered_2nd <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/QC/OM_seurat_2nd.rds")
+
+srat_QC_1st <- subset(OM_seurat_prefiltered_1st, subset = percent.mt<1 & nFeature_RNA>500)
+srat_QC_2nd <- subset(OM_seurat_prefiltered_2nd, subset = percent.mt<1 & nFeature_RNA>500)
+
+
+srat_OM1 <- subset(srat_QC_1st,subset=sample.origin=="OM1")
+#Pre-process KA1 seurat object
+srat_OM1 <- SCTransform(srat_OM1,verbose=F)
+srat_OM1 <- RunPCA(srat_OM1, features = VariableFeatures(object = srat_OM1))
+srat_OM1 <- FindNeighbors(srat_OM1, dims = 1:20)
+srat_OM1 <- FindClusters(srat_OM1, resolution = 1)
+srat_OM1 <- RunTSNE(srat_OM1)
+srat_OM1 <- RunUMAP(srat_OM1, dims = 1:20)
+
+#pK Identification
+sweep.res.list_OM1 <- paramSweep(srat_OM1, PCs = 1:20, sct = T)
+sweep.stats_OM1 <- summarizeSweep(sweep.res.list_OM1, GT = FALSE)
+ 
+pK_OM1 <- sweep.stats_OM1 %>% filter(BCreal == max(BCreal)) %>% select(pK) 
+pK_OM1<- as.numeric(as.character(pK_OM1[[1]]))
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+homotypic.prop_OM1 <- modelHomotypic(srat_OM1$SCT_snn_res.1)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+nExp_poi_OM1 <- round(0.008*nrow(srat_OM1@meta.data))  ## Assuming 3.5% doublet formation rate - tailor for your dataset
+nExp_poi.adj_OM1 <- round(nExp_poi_OM1*(1-homotypic.prop_OM1))
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+srat_OM1 <- doubletFinder(srat_OM1, PCs = 1:20, pN = 0.25, pK = pK_OM1, nExp = nExp_poi_OM1, reuse.pANN = FALSE, sct = T)
+
+
+saveRDS(srat_OM1,"srat_OM1.rds")
+to_keep <- c(colnames(srat_OM1@meta.data),"UMAP_1","UMAP_2")
+df_out<- FetchData(srat_OM1,to_keep) %>% rownames_to_column("cell")
+out_name <- paste0("./OM1_",Sys.Date(),"_cell_metadata.tsv.gz")
+write_csv(df_out,out_name)
+##################################################################################
+
+srat_OM2 <- subset(srat_QC_1st,subset=sample.origin=="OM2")
+#Pre-process KA1 seurat object
+srat_OM2 <- SCTransform(srat_OM2,verbose=F)
+srat_OM2 <- RunPCA(srat_OM2, features = VariableFeatures(object = srat_OM2))
+srat_OM2 <- FindNeighbors(srat_OM2, dims = 1:20)
+srat_OM2 <- FindClusters(srat_OM2, resolution = 1)
+srat_OM2 <- RunTSNE(srat_OM2)
+srat_OM2 <- RunUMAP(srat_OM2, dims = 1:20)
+
+#pK Identification
+sweep.res.list_OM2 <- paramSweep(srat_OM2, PCs = 1:10, sct = T)
+sweep.stats_OM2 <- summarizeSweep(sweep.res.list_OM2, GT = FALSE)
+
+pK_OM2 <- sweep.stats_OM2 %>% filter(BCreal == max(BCreal)) %>% select(pK) 
+pK_OM2<- as.numeric(as.character(pK_OM2[[1]]))
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+homotypic.prop_OM2 <- modelHomotypic(srat_OM2$SCT_snn_res.1)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+nExp_poi_OM2 <- round(0.004*nrow(srat_OM2@meta.data))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+nExp_poi.adj_OM2 <- round(nExp_poi_OM2*(1-homotypic.prop_OM2))
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+srat_OM2 <- doubletFinder(srat_OM2, PCs = 1:10, pN = 0.25, pK = pK_OM2, nExp = nExp_poi_OM2, reuse.pANN = FALSE, sct = T)
+
+
+saveRDS(srat_OM2,"srat_OM2.rds")
+to_keep <- c(colnames(srat_OM2@meta.data),"UMAP_1","UMAP_2")
+df_out<- FetchData(srat_OM2,to_keep) %>% rownames_to_column("cell")
+out_name <- paste0("./OM2_",Sys.Date(),"_cell_metadata.tsv.gz")
+write_csv(df_out,out_name)
+
+
+
+################################################################################################################
+srat_OM3 <- subset(srat_QC_1st,subset=sample.origin=="OM3")
+#Pre-process KA1 seurat object
+srat_OM3 <- SCTransform(srat_OM3,verbose=F)
+srat_OM3 <- RunPCA(srat_OM3, features = VariableFeatures(object = srat_OM3))
+srat_OM3 <- FindNeighbors(srat_OM3, dims = 1:20)
+srat_OM3 <- FindClusters(srat_OM3, resolution = 1)
+srat_OM3 <- RunTSNE(srat_OM3)
+srat_OM3 <- RunUMAP(srat_OM3, dims = 1:20)
+
+#pK Identification
+sweep.res.list_OM3 <- paramSweep(srat_OM3, PCs = 1:10, sct = T)
+sweep.stats_OM3 <- summarizeSweep(sweep.res.list_OM3, GT = FALSE)
+bcmvn_OM3 <- find.pK(sweep.stats_OM3)
+
+pK_OM3 <- sweep.stats_OM3 %>% filter(BCreal == max(BCreal)) %>% select(pK) 
+pK_OM3<- as.numeric(as.character(pK_OM3[[1]]))
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+homotypic.prop_OM3 <- modelHomotypic(srat_OM3$SCT_snn_res.1)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+nExp_poi_OM3 <- round(0.004*nrow(srat_OM3@meta.data))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+nExp_poi.adj_OM3 <- round(nExp_poi_OM3*(1-homotypic.prop_OM3))
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+srat_OM3 <- doubletFinder(srat_OM3, PCs = 1:10, pN = 0.25, pK = pK_OM3, nExp = nExp_poi_OM3, reuse.pANN = FALSE, sct = T)
+
+
+saveRDS(srat_OM3,"srat_OM3.rds")
+to_keep <- c(colnames(srat_OM3@meta.data),"UMAP_1","UMAP_2")
+df_out<- FetchData(srat_OM3,to_keep) %>% rownames_to_column("cell")
+out_name <- paste0("./srat_OM3_",Sys.Date(),"_cell_metadata.tsv.gz")
+write_csv(df_out,out_name)
+################################################################################################################
+srat_OM4 <- subset(srat_QC_1st,subset=sample.origin=="OM4")
+#Pre-process KA1 seurat object
+srat_OM4 <- SCTransform(srat_OM4,verbose=F)
+srat_OM4 <- RunPCA(srat_OM4, features = VariableFeatures(object = srat_OM4))
+srat_OM4 <- FindNeighbors(srat_OM4, dims = 1:20)
+srat_OM4 <- FindClusters(srat_OM4, resolution = 1)
+srat_OM4 <- RunTSNE(srat_OM4)
+srat_OM4 <- RunUMAP(srat_OM4, dims = 1:20)
+
+#pK Identification
+sweep.res.list_OM4 <- paramSweep(srat_OM4, PCs = 1:10, sct = T)
+sweep.stats_OM4 <- summarizeSweep(sweep.res.list_OM4, GT = FALSE)
+bcmvn_OM4 <- find.pK(sweep.stats_OM4)
+
+pK_OM4 <- sweep.stats_OM4 %>% filter(BCreal == max(BCreal)) %>% select(pK) 
+pK_OM4 <- as.numeric(as.character(pK_OM4[[1]]))
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+homotypic.prop_OM4 <- modelHomotypic(srat_OM4$SCT_snn_res.1)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+nExp_poi_OM4 <- round(0.008*nrow(srat_OM4@meta.data))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+nExp_poi.adj_OM4 <- round(nExp_poi_OM4*(1-homotypic.prop_OM4))
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+srat_OM4 <- doubletFinder(srat_OM4, PCs = 1:10, pN = 0.25, pK = pK_OM4, nExp = nExp_poi_OM4, reuse.pANN = FALSE, sct = T)
+
+
+saveRDS(srat_OM4,"srat_OM4.rds")
+to_keep <- c(colnames(srat_OM4@meta.data),"UMAP_1","UMAP_2")
+df_out<- FetchData(srat_OM4,to_keep) %>% rownames_to_column("cell")
+out_name <- paste0("./OM4_",Sys.Date(),"_cell_metadata.tsv.gz")
+write_csv(df_out,out_name)
+
+# ###############################################################################################
+srat_OM5 <- subset(srat_QC_2nd,subset=sample.origin=="OM5")
+#Pre-process KA1 seurat object
+srat_OM5 <- SCTransform(srat_OM5,verbose=F)
+srat_OM5 <- RunPCA(srat_OM5, features = VariableFeatures(object = srat_OM5))
+srat_OM5 <- FindNeighbors(srat_OM5, dims = 1:20)
+srat_OM5 <- FindClusters(srat_OM5, resolution = 1)
+srat_OM5 <- RunTSNE(srat_OM5)
+srat_OM5 <- RunUMAP(srat_OM5, dims = 1:20)
+
+#pK Identification
+sweep.res.list_OM5 <- paramSweep(srat_OM5, PCs = 1:10, sct = T)
+sweep.stats_OM5 <- summarizeSweep(sweep.res.list_OM5, GT = FALSE)
+bcmvn_OM5 <- find.pK(sweep.stats_OM5)
+
+pK_OM5 <- sweep.stats_OM5 %>% filter(BCreal == max(BCreal)) %>% select(pK) 
+pK_OM5 <- as.numeric(as.character(pK_OM5[[1]]))
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+homotypic.prop_OM5 <- modelHomotypic(srat_OM5$SCT_snn_res.1)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+nExp_poi_OM5 <- round(0.024*nrow(srat_OM5@meta.data))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+nExp_poi.adj_OM5 <- round(nExp_poi_OM5*(1-homotypic.prop_OM5))
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+srat_OM5 <- doubletFinder(srat_OM5, PCs = 1:10, pN = 0.25, pK = pK_OM5, nExp = nExp_poi_OM5, reuse.pANN = FALSE, sct = T)
+
+saveRDS(srat_OM5,"srat_OM5.rds")
+to_keep <- c(colnames(srat_OM5@meta.data),"UMAP_1","UMAP_2")
+df_out<- FetchData(srat_OM5,to_keep) %>% rownames_to_column("cell")
+out_name <- paste0("./OM5_",Sys.Date(),"_cell_metadata.tsv.gz")
+write_csv(df_out,out_name)
+
+###############################################################################################
+srat_OM6 <- subset(srat_QC_2nd,subset=sample.origin=="OM6")
+#Pre-process KA1 seurat object
+srat_OM6 <- SCTransform(srat_OM6,verbose=F)
+srat_OM6 <- RunPCA(srat_OM6, features = VariableFeatures(object = srat_OM6))
+srat_OM6 <- FindNeighbors(srat_OM6, dims = 1:20)
+srat_OM6 <- FindClusters(srat_OM6, resolution = 1)
+srat_OM6 <- RunTSNE(srat_OM6)
+srat_OM6 <- RunUMAP(srat_OM6, dims = 1:20)
+
+#pK Identification
+sweep.res.list_OM6 <- paramSweep(srat_OM6, PCs = 1:10, sct = T)
+sweep.stats_OM6 <- summarizeSweep(sweep.res.list_OM6, GT = FALSE)
+bcmvn_OM6 <- find.pK(sweep.stats_OM6)
+
+pK_OM6 <- sweep.stats_OM6 %>% filter(BCreal == max(BCreal)) %>% select(pK) 
+pK_OM6 <- as.numeric(as.character(pK_OM6[[1]]))
+
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+homotypic.prop_OM6 <- modelHomotypic(srat_OM6$SCT_snn_res.1)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+nExp_poi_OM6 <- round(0.24*nrow(srat_OM6@meta.data))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+nExp_poi.adj_OM6 <- round(nExp_poi_OM6*(1-homotypic.prop_OM6))
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+srat_OM6 <- doubletFinder(srat_OM6, PCs = 1:10, pN = 0.25, pK = pK_OM6, nExp = nExp_poi_OM6 ,reuse.pANN = FALSE, sct = T)
+
+saveRDS(srat_OM6,"srat_OM6.rds")
+to_keep <- c(colnames(srat_OM6@meta.data),"UMAP_1","UMAP_2")
+df_out<- FetchData(srat_OM6,to_keep) %>% rownames_to_column("cell")
+out_name <- paste0("./OM6_",Sys.Date(),"_cell_metadata.tsv.gz")
+write_csv(df_out,out_name)
+###############################################################################################
+srat_OM7 <- subset(srat_QC_2nd,subset=sample.origin=="OM7")
+#Pre-process KA1 seurat object
+srat_OM7 <- SCTransform(srat_OM7,verbose=F)
+srat_OM7 <- RunPCA(srat_OM7, features = VariableFeatures(object = srat_OM7))
+srat_OM7 <- FindNeighbors(srat_OM7, dims = 1:20)
+srat_OM7 <- FindClusters(srat_OM7, resolution = 1)
+srat_OM7 <- RunTSNE(srat_OM7)
+srat_OM7 <- RunUMAP(srat_OM7, dims = 1:20)
+
+#pK Identification
+sweep.res.list_OM7 <- paramSweep(srat_OM7, PCs = 1:10, sct = T)
+sweep.stats_OM7 <- summarizeSweep(sweep.res.list_OM7, GT = FALSE)
+bcmvn_OM7 <- find.pK(sweep.stats_OM7)
+
+pK_OM7 <- sweep.stats_OM7 %>% filter(BCreal == max(BCreal)) %>% select(pK) 
+pK_OM7 <- as.numeric(as.character(pK_OM7[[1]]))
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+homotypic.prop_OM7 <- modelHomotypic(srat_OM7$SCT_snn_res.1)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+nExp_poi_OM7 <- round(0.024*nrow(srat_OM7@meta.data))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+nExp_poi.adj_OM7 <- round(nExp_poi_OM7*(1-homotypic.prop_OM7))
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+srat_OM7 <- doubletFinder(srat_OM7, PCs = 1:10, pN = 0.25, pK = pK_OM7, nExp = nExp_poi_OM7, reuse.pANN = FALSE, sct = T)
+
+saveRDS(srat_OM7,"srat_OM7.rds")
+to_keep <- c(colnames(srat_OM7@meta.data),"UMAP_1","UMAP_2")
+df_out<- FetchData(srat_OM7,to_keep) %>% rownames_to_column("cell")
+out_name <- paste0("./OM7_",Sys.Date(),"_cell_metadata.tsv.gz")
+write_csv(df_out,out_name)
+
+###############################################################################################
+srat_OM8 <- subset(OM_seurat_prefiltered_2nd,subset=sample.origin=="OM8")
+#Pre-process KA1 seurat object
+srat_OM8 <- SCTransform(srat_OM8,verbose=F)
+srat_OM8 <- RunPCA(srat_OM8, features = VariableFeatures(object = srat_OM8))
+srat_OM8 <- FindNeighbors(srat_OM8, dims = 1:20)
+srat_OM8 <- FindClusters(srat_OM8, resolution = 1)
+srat_OM8 <- RunTSNE(srat_OM8)
+srat_OM8 <- RunUMAP(srat_OM8, dims = 1:20)
+
+#pK Identification
+sweep.res.list_OM8 <- paramSweep(srat_OM8, PCs = 1:10, sct = T)
+sweep.stats_OM8 <- summarizeSweep(sweep.res.list_OM8, GT = FALSE)
+bcmvn_OM8 <- find.pK(sweep.stats_OM8)
+
+pK_OM8 <- sweep.stats_OM8 %>% filter(BCreal == max(BCreal)) %>% select(pK) 
+pK_OM8 <- as.numeric(as.character(pK_OM8[[1]]))
+## Homotypic Doublet Proportion Estimate -------------------------------------------------------------------------------------
+homotypic.prop_OM8 <- modelHomotypic(srat_OM8$SCT_snn_res.1)           ## ex: annotations <- seu_kidney@meta.data$ClusteringResults
+nExp_poi_OM8 <- round(0.024*nrow(srat_OM8@meta.data))  ## Assuming 7.5% doublet formation rate - tailor for your dataset
+nExp_poi.adj_OM8 <- round(nExp_poi_OM8*(1-homotypic.prop_OM8))
+
+## Run DoubletFinder with varying classification stringencies ----------------------------------------------------------------
+srat_OM8<- doubletFinder(srat_OM8, PCs = 1:10, pN = 0.25, pK = pK_OM8, nExp = nExp_poi_OM8, reuse.pANN = FALSE, sct = T)
+
+saveRDS(srat_OM8,"srat_OM8.rds")
+to_keep <- c(colnames(srat_OM8@meta.data),"UMAP_1","UMAP_2")
+df_out<- FetchData(srat_OM8,to_keep) %>% rownames_to_column("cell")
+out_name <- paste0("./OM8_",Sys.Date(),"_cell_metadata.tsv.gz")
+write_csv(df_out,out_name)
+
+
+
+
+
+######################
+
+#Total number of singlets/doublets per sample 
+# table(srat_PBS4$DF.classifications_0.25_0.21_164)
+# #Check number of doublets in OPC subtype per sample
+# subset(srat_PBS4,subset=subclass_new=="326 OPC NN" & DoubletFinder=="Doublet") 
+# 
+# subset(srat_PBS3,subset=subclass_new=="326 OPC NN" & DF.classifications_0.25_0.21_164=="Doublet") 
+
+```

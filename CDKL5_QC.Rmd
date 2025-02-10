@@ -1,0 +1,406 @@
+---
+title: "cdkl5_qc"
+author: "Javier Villegas"
+date: "2025-01-22"
+output: html_document
+---
+
+
+```{r setup}
+library(Seurat)
+library(tidyverse)
+
+#Creating the output folder in case it's not there 
+
+output_dir <- paste0("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/")
+    if (!dir.exists(output_dir)) {
+      dir.create(output_dir, recursive = TRUE)}
+options(future.globals.maxSize = 6000 * 1024^2)
+
+```
+
+
+###Creating seurat object and filtering
+```{r Creating Seurat objects}
+#Read barcode matrix
+OM1 <- Read10X_h5("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/Count matrices/OM1_matrix.h5")
+OM2 <- Read10X_h5("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/Count matrices/OM2_matrix.h5")
+OM3 <- Read10X_h5("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/Count matrices/OM3_matrix.h5")
+OM4 <- Read10X_h5("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/Count matrices/OM4_matrix.h5")
+
+
+OM5 <- Read10X_h5("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/Count matrices/OM5_matrix.h5")
+OM6 <- Read10X_h5("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/Count matrices/OM6_matrix.h5")
+OM7 <- Read10X_h5("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/Count matrices/OM7_matrix.h5")
+OM8 <- Read10X_h5("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/Count matrices/OM8_matrix.h5")
+
+
+
+#Create seurat objects
+OM1_SO <- CreateSeuratObject(counts = OM1)
+OM2_SO  <-CreateSeuratObject(counts = OM2)
+OM3_SO  <-CreateSeuratObject(counts = OM3)
+OM4_SO  <-CreateSeuratObject(counts = OM4)
+
+OM5_SO <-CreateSeuratObject(counts = OM5)
+OM6_SO <-CreateSeuratObject(counts = OM6)
+OM7_SO <-CreateSeuratObject(counts = OM7)
+OM8_SO <-CreateSeuratObject(counts = OM8)
+
+
+#Merge seurat objects
+OM_seurat_1st <- merge(OM1_SO,y=c(OM2_SO,OM3_SO,OM4_SO),add.cell.ids=c("OM1","OM2","OM3","OM4"),project="OCT2024_CDKL5",merge.data=T)
+OM_seurat_1st[["RNA"]] <- JoinLayers(OM_seurat_1st[["RNA"]])
+#Add a column on the metadata that reflects sample of origin for each cell
+OM_seurat_1st[["sample.origin"]] <- sapply(X = strsplit(colnames(OM_seurat_1st), split = "_"), FUN = "[", 1)
+Idents(OM_seurat_1st) <- OM_seurat_1st$sample.origin
+OM_seurat_1st$condition <- ifelse(test = OM_seurat_1st$sample.origin %in% c("OM1","OM2"), yes = "WILD", no = "HET")
+OM_seurat_1st[["percent.mt"]] <- PercentageFeatureSet(OM_seurat_1st, pattern = "^mt-")
+
+OM_seurat_1st <- SCTransform(OM_seurat_1st,verbose=F)
+OM_seurat_1st <- RunPCA(OM_seurat_1st, features = VariableFeatures(object = OM_seurat_1st))
+OM_seurat_1st <- FindNeighbors(OM_seurat_1st, dims = 1:20)
+OM_seurat_1st <- FindClusters(OM_seurat_1st, resolution = 1)
+OM_seurat_1st <- RunTSNE(OM_seurat_1st)
+OM_seurat_1st <- RunUMAP(OM_seurat_1st, dims = 1:20)
+
+
+
+
+# #Merge seurat objects second run OM5-OM8
+OM_seurat_2nd <- merge(OM5_SO,y=c(OM6_SO,OM7_SO,OM8_SO),add.cell.ids=c("OM5","OM6","OM7","OM8"),project="DEC2024_CDKL5",merge.data=T)
+OM_seurat_2nd[["RNA"]] <- JoinLayers(OM_seurat_2nd[["RNA"]])
+#Add a column on the metadata that reflects sample of origin for each cell
+OM_seurat_2nd[["sample.origin"]] <- sapply(X = strsplit(colnames(OM_seurat_2nd), split = "_"), FUN = "[", 1)
+Idents(OM_seurat_2nd) <- OM_seurat_2nd$sample.origin
+OM_seurat_2nd$condition <- ifelse(test = OM_seurat_2nd$sample.origin %in% c("OM5","OM6"), yes = "WILD", no = "HET")
+OM_seurat_2nd[["percent.mt"]] <- PercentageFeatureSet(OM_seurat_2nd, pattern = "^mt-")
+
+
+OM_seurat_2nd <- SCTransform(OM_seurat_2nd,verbose=F)
+OM_seurat_2nd <- RunPCA(OM_seurat_2nd, features = VariableFeatures(object = OM_seurat_2nd))
+OM_seurat_2nd <- FindNeighbors(OM_seurat_2nd, dims = 1:20)
+OM_seurat_2nd <- FindClusters(OM_seurat_2nd, resolution = 1)
+OM_seurat_2nd <- RunTSNE(OM_seurat_2nd)
+OM_seurat_2nd <- RunUMAP(OM_seurat_2nd, dims = 1:20)
+
+```
+
+```{r Initial QC and clustering}
+# options(future.globals.maxSize = 6000 * 1024^2)
+# KA1_SO <- SCTransform(KA1_SO,verbose=F)
+# KA1_SO <- RunPCA(KA1_SO, features = VariableFeatures(object = KA1_SO))
+# KA1_SO <- FindNeighbors(KA1_SO, dims = 1:20)
+# KA1_SO <- FindClusters(KA1_SO, resolution = 1)
+# KA1_SO <- RunUMAP(KA1_SO, dims = 1:20)
+KA1_SO[["percent.mt"]] <- PercentageFeatureSet(KA1_SO, pattern = "^mt-")
+#saveRDS(KA1_SO,"KA1_SO_prefiltered.rds")
+
+#Ploting UMAP of prefiltered-sample
+
+DimPlot(KA1_SO)
+ggsave("KA1_SO/KA1_SO_umap.png",plot=DimPlot(KA1_SO),width = 6, height=6,dpi=300)
+
+##Plotting percent.mt
+FeaturePlot(KA1_SO,features = "percent.mt")
+ggsave("KA1_SO/KA1_SO_percentmt.png",plot=FeaturePlot(KA1_SO,features = "percent.mt"),width = 6, height=6,dpi=300)
+hist(KA1_SO$percent.mt)
+
+#Plotting nCount_RNA
+FeaturePlot(KA1_SO,features = "nCount_RNA")
+ggsave("KA1_SO/KA1_SO_nCount.png",plot=FeaturePlot(KA1_SO,features = "nCount_RNA"),width = 6, height=6,dpi=300)
+hist(KA1_SO$nCount_RNA)
+
+#Plotting nFeature_RNA
+FeaturePlot(KA1_SO,features = "nFeature_RNA")
+ggsave("KA1_SO/KA1_SO_nFeature.png",plot=FeaturePlot(KA1_SO,features = "nFeature_RNA"),width = 6, height=6,dpi=300)
+hist(KA1_SO$nFeature_SCT)
+
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(KA1_SO), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(KA1_SO)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+ggsave("KA1_SO/KA1_SO_variableFeatures.png",plot=plot1 + plot2,width = 14, height=10,dpi=300)
+
+
+# KA2_SO <- SCTransform(KA2_SO,verbose=F)
+# KA2_SO <- RunPCA(KA2_SO, features = VariableFeatures(object = KA2_SO))
+# KA2_SO <- FindNeighbors(KA2_SO, dims = 1:20)
+# KA2_SO <- FindClusters(KA2_SO, resolution = 1)
+# KA2_SO <- RunUMAP(KA2_SO, dims = 1:20)
+KA2_SO[["percent.mt"]] <- PercentageFeatureSet(KA2_SO, pattern = "^mt-")
+#saveRDS(KA2_SO,"KA2_SO_prefiltered.rds")
+
+#Ploting UMAP of prefiltered-sample
+DimPlot(KA2_SO)
+ggsave("KA2_SO/KA2_SO_umap.png",plot=DimPlot(KA2_SO),width = 6, height=6,dpi=300)
+
+##Plotting percent.mt
+FeaturePlot(KA2_SO,features = "percent.mt")
+ggsave("KA2_SO/KA2_SO_percentmt.png",plot=FeaturePlot(KA2_SO,features = "percent.mt"),width = 6, height=6,dpi=300)
+hist(KA2_SO$percent.mt)
+hist(KA2_SO$nCount_RNA)
+
+#Plotting nCount_RNA
+FeaturePlot(KA2_SO,features = "nCount_RNA")
+ggsave("KA2_SO/KA2_SO_nCount.png",plot=FeaturePlot(KA2_SO,features = "nCount_RNA"),width = 6, height=6,dpi=300)
+
+#Plotting nFeature_RNA
+FeaturePlot(KA2_SO,features = "nFeature_RNA")
+ggsave("KA2_SO/KA2_SO_nFeature.png",plot=FeaturePlot(KA2_SO,features = "nFeature_RNA"),width = 6, height=6,dpi=300)
+hist(KA2_SO$nFeature_SCT)
+
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(KA2_SO), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(KA2_SO)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+ggsave("KA2_SO/KA2_SO_variableFeatures.png",plot=plot1 + plot2,width = 14, height=10,dpi=300)
+
+
+# KA3_SO <- SCTransform(KA3_SO,verbose=F)
+# KA3_SO <- RunPCA(KA3_SO, features = VariableFeatures(object = KA3_SO))
+# KA3_SO <- FindNeighbors(KA3_SO, dims = 1:20)
+# KA3_SO <- FindClusters(KA3_SO, resolution = 1)
+# KA3_SO <- RunUMAP(KA3_SO, dims = 1:20)
+KA3_SO[["percent.mt"]] <- PercentageFeatureSet(KA3_SO, pattern = "^mt-")
+#saveRDS(KA3_SO,"KA3_SO_prefiltered.rds")
+
+#Ploting UMAP of prefiltered-sample
+DimPlot(KA3_SO)
+ggsave("KA3_SO/KA3_SO_umap.png",plot=DimPlot(KA3_SO),width = 6, height=6,dpi=300)
+
+##Plotting percent.mt
+FeaturePlot(KA3_SO,features = "percent.mt")
+ggsave("KA3_SO/KA3_SO_percentmt.png",plot=FeaturePlot(KA3_SO,features = "percent.mt"),width = 6, height=6,dpi=300)
+hist(KA3_SO$percent.mt)
+
+#Plotting nCount_RNA
+FeaturePlot(KA3_SO,features = "nCount_RNA")
+ggsave("KA3_SO/KA3_SO_nCount.png",plot=FeaturePlot(KA3_SO,features = "nCount_RNA"),width = 6, height=6,dpi=300)
+hist(KA3_SO$nCount_RNA)
+
+#Plotting nFeature_RNA
+FeaturePlot(KA3_SO,features = "nFeature_RNA")
+ggsave("KA3_SO/KA3_SO_nFeature.png",plot=FeaturePlot(KA3_SO,features = "nFeature_RNA"),width = 6, height=6,dpi=300)
+hist(KA3_SO$nFeature_SCT)
+
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(KA3_SO), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(KA3_SO)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+ggsave("KA3_SO/KA3_SO_variableFeatures.png",plot=plot1 + plot2,width = 14, height=10,dpi=300)
+
+
+# KA4_SO <- SCTransform(KA4_SO,verbose=F)
+# KA4_SO <- RunPCA(KA4_SO, features = VariableFeatures(object = KA4_SO))
+# KA4_SO <- FindNeighbors(KA4_SO, dims = 1:20)
+# KA4_SO <- FindClusters(KA4_SO, resolution = 1)
+# KA4_SO <- RunUMAP(KA4_SO, dims = 1:20)
+KA4_SO[["percent.mt"]] <- PercentageFeatureSet(KA4_SO, pattern = "^mt-")
+#saveRDS(KA4_SO,"KA4_SO_prefiltered.rds")
+
+#Ploting UMAP of prefiltered-sample
+DimPlot(KA4_SO)
+ggsave("KA4_SO/KA4_SO_umap.png",plot=DimPlot(KA4_SO),width = 6, height=6,dpi=300)
+
+##Plotting percent.mt
+FeaturePlot(KA4_SO,features = "percent.mt")
+ggsave("KA4_SO/KA4_SO_percentmt.png",plot=FeaturePlot(KA4_SO,features = "percent.mt"),width = 6, height=6,dpi=300)
+hist(KA4_SO$percent.mt)
+
+#Plotting nCount_RNA
+FeaturePlot(KA4_SO,features = "nCount_RNA")
+ggsave("KA4_SO/KA4_SO_nCount.png",plot=FeaturePlot(KA4_SO,features = "nCount_RNA"),width = 6, height=6,dpi=300)
+hist(KA4_SO$nCount_RNA)
+
+#Plotting nFeature_RNA
+FeaturePlot(KA4_SO,features = "nFeature_RNA")
+ggsave("KA4_SO/KA4_SO_nFeature.png",plot=FeaturePlot(KA4_SO,features = "nFeature_RNA"),width = 6, height=6,dpi=300)
+hist(KA4_SO$nFeature_SCT)
+
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(KA4_SO), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(KA4_SO)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+ggsave("KA4_SO/KA4_SO_variableFeatures.png",plot=plot1 + plot2,width = 14, height=10,dpi=300)
+
+
+# 
+# PBS1_SO <- SCTransform(PBS1_SO,verbose=F)
+# PBS1_SO <- RunPCA(PBS1_SO, features = VariableFeatures(object = PBS1_SO))
+# PBS1_SO <- FindNeighbors(PBS1_SO, dims = 1:20)
+# PBS1_SO <- FindClusters(PBS1_SO, resolution = 1)
+# PBS1_SO <- RunUMAP(PBS1_SO, dims = 1:20)
+PBS1_SO[["percent.mt"]] <- PercentageFeatureSet(PBS1_SO, pattern = "^mt-")
+#saveRDS(PBS1_SO,"PBS1_SO_prefiltered.rds")
+
+#Ploting UMAP of prefiltered-sample
+DimPlot(PBS1_SO)
+ggsave("PBS1_SO/PBS1_SO_umap.png",plot=DimPlot(PBS1_SO),width = 6, height=6,dpi=300)
+
+##Plotting percent.mt
+FeaturePlot(PBS1_SO,features = "percent.mt")
+ggsave("PBS1_SO/PBS1_SO_percentmt.png",plot=FeaturePlot(PBS1_SO,features = "percent.mt"),width = 6, height=6,dpi=300)
+hist(PBS1_SO$percent.mt)
+
+#Plotting nCount_RNA
+FeaturePlot(PBS1_SO,features = "nCount_RNA")
+ggsave("PBS1_SO/PBS1_SO_nCount.png",plot=FeaturePlot(PBS1_SO,features = "nCount_RNA"),width = 6, height=6,dpi=300)
+hist(PBS1_SO$nCount_RNA)
+
+#Plotting nFeature_RNA
+FeaturePlot(PBS1_SO,features = "nFeature_RNA")
+ggsave("PBS1_SO/PBS1_SO_nFeature.png",plot=FeaturePlot(PBS1_SO,features = "nFeature_RNA"),width = 6, height=6,dpi=300)
+hist(PBS1_SO$nFeature_SCT)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(PBS1_SO), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(PBS1_SO)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+ggsave("PBS1_SO/PBS1_SO_variableFeatures.png",plot=plot1 + plot2,width = 14, height=10,dpi=300)
+
+
+# PBS2_SO <- SCTransform(PBS2_SO,verbose=F)
+# PBS2_SO <- RunPCA(PBS2_SO, features = VariableFeatures(object = PBS2_SO))
+# PBS2_SO <- FindNeighbors(PBS2_SO, dims = 1:20)
+# PBS2_SO <- FindClusters(PBS2_SO, resolution = 1)
+# PBS2_SO <- RunUMAP(PBS2_SO, dims = 1:20)
+PBS2_SO[["percent.mt"]] <- PercentageFeatureSet(PBS2_SO, pattern = "^mt-")
+#saveRDS(PBS2_SO,"PBS2_SO_prefiltered.rds")
+
+#Ploting UMAP of prefiltered-sample
+DimPlot(PBS2_SO)
+ggsave("PBS2_SO/PBS2_SO_umap.png",plot=DimPlot(PBS2_SO),width = 6, height=6,dpi=300)
+
+##Plotting percent.mt
+FeaturePlot(PBS2_SO,features = "percent.mt")
+ggsave("PBS2_SO/PBS2_SO_percentmt.png",plot=FeaturePlot(PBS2_SO,features = "percent.mt"),width = 6, height=6,dpi=300)
+hist(PBS2_SO$percent.mt)
+
+#Plotting nCount_RNA
+FeaturePlot(PBS2_SO,features = "nCount_RNA")
+ggsave("PBS2_SO/PBS2_SO_nCount.png",plot=FeaturePlot(PBS2_SO,features = "nCount_RNA"),width = 6, height=6,dpi=300)
+hist(PBS2_SO$nCount_RNA)
+
+#Plotting nFeature_RNA
+FeaturePlot(PBS2_SO,features = "nFeature_RNA")
+ggsave("PBS2_SO/PBS2_SO_nFeature.png",plot=FeaturePlot(PBS2_SO,features = "nFeature_RNA"),width = 6, height=6,dpi=300)
+hist(PBS2_SO$nFeature_SCT)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(PBS2_SO), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(PBS2_SO)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+ggsave("PBS2_SO/PBS2_SO_variableFeatures.png",plot=plot1 + plot2,width = 14, height=10,dpi=300)
+
+
+# PBS3_SO <- SCTransform(PBS3_SO,verbose=F)
+# PBS3_SO <- RunPCA(PBS3_SO, features = VariableFeatures(object = PBS3_SO))
+# PBS3_SO <- FindNeighbors(PBS3_SO, dims = 1:20)
+# PBS3_SO <- FindClusters(PBS3_SO, resolution = 1)
+# PBS3_SO <- RunUMAP(PBS3_SO, dims = 1:20)
+PBS3_SO[["percent.mt"]] <- PercentageFeatureSet(PBS3_SO, pattern = "^mt-")
+#saveRDS(PBS3_SO,"PBS3_SO_prefiltered.rds")
+
+#Ploting UMAP of prefiltered-sample
+DimPlot(PBS3_SO)
+ggsave("PBS3_SO/PBS3_SO_umap.png",plot=DimPlot(PBS3_SO),width = 6, height=6,dpi=300)
+
+
+##Plotting percent.mt
+FeaturePlot(PBS3_SO,features = "percent.mt")
+ggsave("PBS3_SO/PBS3_SO_percentmt.png",plot=FeaturePlot(PBS3_SO,features = "percent.mt"),width = 6, height=6,dpi=300)
+hist(PBS3_SO$percent.mt)
+
+#Plotting nCount_RNA
+FeaturePlot(PBS3_SO,features = "nCount_RNA")
+ggsave("PBS3_SO/PBS3_SO_nCount.png",plot=FeaturePlot(PBS3_SO,features = "nCount_RNA"),width = 6, height=6,dpi=300)
+hist(PBS3_SO$nCount_RNA)
+
+#Plotting nFeature_RNA
+FeaturePlot(PBS3_SO,features = "nFeature_RNA")
+ggsave("PBS3_SO/PBS3_SO_nFeature.png",plot=FeaturePlot(PBS3_SO,features = "nFeature_RNA"),width = 6, height=6,dpi=300)
+hist(PBS3_SO$nFeature_SCT)
+
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(PBS3_SO), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(PBS3_SO)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+ggsave("PBS3_SO/PBS3_SO_variableFeatures.png",plot=plot1 + plot2,width = 14, height=10,dpi=300)
+
+
+# PBS4_SO <- SCTransform(PBS4_SO,verbose=F)
+# PBS4_SO <- RunPCA(PBS4_SO, features = VariableFeatures(object = PBS4_SO))
+# PBS4_SO <- FindNeighbors(PBS4_SO, dims = 1:20)
+# PBS4_SO <- FindClusters(PBS4_SO, resolution = 1)
+# PBS4_SO <- RunUMAP(PBS4_SO, dims = 1:20)
+PBS4_SO[["percent.mt"]] <- PercentageFeatureSet(PBS4_SO, pattern = "^mt-")
+#saveRDS(PBS4_SO,"PBS4_SO_prefiltered.rds")
+
+#Ploting UMAP of prefiltered-sample
+DimPlot(PBS4_SO)
+ggsave("PBS4_SO/PBS4_SO_umap.png",plot=DimPlot(PBS4_SO),width = 6, height=6,dpi=300)
+
+##Plotting percent.mt
+FeaturePlot(PBS4_SO,features = "percent.mt")
+ggsave("PBS4_SO/PBS4_SO_percentmt.png",plot=FeaturePlot(PBS4_SO,features = "percent.mt"),width = 6, height=6,dpi=300)
+hist(PBS4_SO$percent.mt)
+
+
+#Plotting nCount_RNA
+FeaturePlot(PBS4_SO,features = "nCount_RNA")
+ggsave("PBS4_SO/PBS4_SO_nCount.png",plot=FeaturePlot(PBS4_SO,features = "nCount_RNA"),width = 6, height=6,dpi=300)
+hist(PBS4_SO$nCount_RNA)
+
+#Plotting nFeature_RNA
+FeaturePlot(PBS4_SO,features = "nFeature_RNA")
+ggsave("PBS4_SO/PBS4_SO_nFeature.png",plot=FeaturePlot(PBS4_SO,features = "nFeature_RNA"),width = 6, height=6,dpi=300)
+hist(PBS4_SO$nFeature_SCT)
+
+# Identify the 10 most highly variable genes
+top10 <- head(VariableFeatures(PBS4_SO), 10)
+
+# plot variable features with and without labels
+plot1 <- VariableFeaturePlot(PBS4_SO)
+plot2 <- LabelPoints(plot = plot1, points = top10, repel = TRUE)
+plot1 + plot2
+
+ggsave("PBS4_SO/PBS4_SO_variableFeatures.png",plot=plot1 + plot2,width = 14, height=10,dpi=300)
+
+
+```
+
+

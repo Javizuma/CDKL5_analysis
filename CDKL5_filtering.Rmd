@@ -1,0 +1,190 @@
+---
+title: "CDKL5_filtering"
+author: "Javier Villegas"
+date: "2025-01-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(Seurat)
+library(tidyverse)
+set.seed(42)
+```
+
+
+
+```{r Merging of Seurat objects}
+##First we read the srat objects after the initial QC and after running the DoubletFinder software
+srat_OM1 <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/doublet/srat_OM1.rds")
+srat_OM1$DoubletFinder <- srat_OM1$DF.classifications_0.25_0.02_8
+
+srat_OM2 <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/doublet/srat_OM2.rds")
+srat_OM2$DoubletFinder <- srat_OM2$DF.classifications_0.25_0.02_2
+
+srat_OM3 <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/doublet/srat_OM3.rds")
+srat_OM3$DoubletFinder <- srat_OM3$DF.classifications_0.25_0.02_2
+
+srat_OM4 <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/doublet/srat_OM4.rds")
+srat_OM4$DoubletFinder <- srat_OM4$DF.classifications_0.25_0.02_8
+
+
+
+srat_OM5 <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/doublet/srat_OM5.rds")
+srat_OM5$DoubletFinder <- srat_OM5$DF.classifications_0.25_0.005_72
+
+srat_OM6 <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/doublet/srat_OM6.rds")
+srat_OM6$DoubletFinder <- srat_OM6$DF.classifications_0.25_0.01_706
+
+srat_OM7 <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/doublet/srat_OM7.rds")
+srat_OM7$DoubletFinder <- srat_OM7$DF.classifications_0.25_0.005_82
+
+srat_OM8 <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/doublet/srat_OM8.rds")
+srat_OM8$DoubletFinder <- srat_OM8$DF.classifications_0.25_0.01_84
+# 
+
+OM_seurat_1st <- merge(srat_OM1,y=c(srat_OM2,srat_OM3,srat_OM4),add.cell.ids=c("OM1","OM2","OM3","OM4"),project="OCT2024_CDKL5",merge.data=T)
+OM_seurat_1st[["RNA"]] <- JoinLayers(OM_seurat_1st[["RNA"]])
+
+
+OM_seurat_2nd <- merge(srat_OM5,y=c(srat_OM6,srat_OM7,srat_OM8),add.cell.ids=c("OM5","OM6","OM7","OM8"),project="DEC2024_CDKL5",merge.data=T)
+OM_seurat_2nd[["RNA"]] <- JoinLayers(OM_seurat_2nd[["RNA"]])
+
+
+# KA_seurat <- merge(srat_KA1,y=c(srat_KA2,srat_KA3,srat_KA4,srat_PBS1,srat_PBS2,srat_PBS3,srat_PBS4),add.cell.ids=c("KA1","KA2","KA3","KA4","PBS1","PBS2","PBS3","PBS4"),project="NOV2024_KA",merge.data=T)
+# KA_seurat[["RNA"]] <- JoinLayers(KA_seurat[["RNA"]])
+
+```
+
+
+```{r 1st run}
+
+OM_seurat_1st <- SCTransform(OM_seurat_1st)
+OM_seurat_1st <- RunPCA(OM_seurat_1st, features = VariableFeatures(object = OM_seurat_1st))
+OM_seurat_1st <- FindNeighbors(OM_seurat_1st, dims = 1:20)
+OM_seurat_1st <- FindClusters(OM_seurat_1st, resolution = 1)
+OM_seurat_1st <- RunTSNE(OM_seurat_1st, dims = 1:20)
+OM_seurat_1st <- RunUMAP(OM_seurat_1st, dims = 1:20)
+# saveRDS(OM_seurat_1st,"1st_run/prefiltering/OM_seurat_1st_prefiltering.rds")
+
+# cluster_markers_prefiltered <- FindAllMarkers(OM_seurat_1st)
+# write.csv(cluster_markers_prefiltered, file = "KA_seurat_prefiltered_allmarkers.csv", row.names = TRUE)
+
+DimPlot(OM_seurat_1st,label=T)
+ggsave("1st_run/prefiltering/OM_seurat_1st_prefiltered_clusters_UMAP.jpg", plot =DimPlot(OM_seurat_1st,label=T),width = 10, height=10,dpi=300)
+DimPlot(OM_seurat_1st,group.by = "DoubletFinder")
+ggsave("1st_run/prefiltering/OM_seurat_1st_prefiltered_DoubletFinder_UMAP.jpg", plot =DimPlot(OM_seurat_1st,group.by = "DoubletFinder"),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_1st,group.by = "sample.origin")
+ggsave("1st_run/prefiltering/OM_seurat_1st_prefiltered_sampleOrigin_UMAP.jpg", plot =DimPlot(OM_seurat_1st,group.by = "sample.origin"),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_1st,group.by = "condition")
+ggsave("1st_run/prefiltering/OM_seurat_1st_prefiltered_condition_UMAP.jpg", plot =DimPlot(OM_seurat_1st,group.by = "condition"),width = 10, height=10,dpi=300)
+
+FeaturePlot(OM_seurat_1st,features = "percent.mt")
+ggsave("1st_run/prefiltering/OM_seurat_1st_prefiltered_percentmt_UMAP.jpg", plot =FeaturePlot(OM_seurat_1st,features = "percent.mt"),width = 10, height=10,dpi=300)
+
+
+OM_seurat_1st_filtered <- subset(OM_seurat_1st,subset=DoubletFinder=="Singlet")
+# 
+DimPlot(OM_seurat_1st_filtered,group.by = "DoubletFinder")
+ggsave("1st_run/filtered/KA_seurat_filtered_DoubletFinder_prerunUMAP_UMAP.jpg", plot =DimPlot(OM_seurat_1st_filtered,group.by = "DoubletFinder"),width = 10, height=10,dpi=300)
+
+OM_seurat_1st_filtered <- SCTransform(OM_seurat_1st_filtered,verbose=F)
+OM_seurat_1st_filtered <- RunPCA(OM_seurat_1st_filtered, features = VariableFeatures(object = OM_seurat_1st_filtered))
+OM_seurat_1st_filtered <- FindNeighbors(OM_seurat_1st_filtered, dims = 1:20)
+OM_seurat_1st_filtered <- FindClusters(OM_seurat_1st_filtered, resolution = 1)
+OM_seurat_1st_filtered <- RunTSNE(OM_seurat_1st_filtered, dims = 1:20)
+OM_seurat_1st_filtered <- RunUMAP(OM_seurat_1st_filtered, dims = 1:20)
+saveRDS(OM_seurat_1st_filtered,"1st_run/filtered/OM_seurat_1st_filtered.rds")
+
+# KA_seurat_filtered[["percent.mt"]] <- PercentageFeatureSet(KA_seurat_filtered, pattern = "^mt-")
+# 
+# 
+DimPlot(OM_seurat_1st_filtered,label=T)
+ggsave("1st_run/filtered/OM_seurat_1st_filtered_clusters_UMAP.jpg", plot =DimPlot(OM_seurat_1st_filtered,label=T),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_1st_filtered,group.by = "DoubletFinder")
+ggsave("1st_run/filtered/OM_seurat_1st_filtered_DoubletFinder_UMAP.jpg", plot =DimPlot(OM_seurat_1st_filtered,group.by = "DoubletFinder"),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_1st_filtered,group.by = "sample.origin")
+ggsave("1st_run/filtered/OM_seurat_1st_filtered_sampleOrigin_UMAP.jpg", plot =DimPlot(OM_seurat_1st_filtered,group.by = "sample.origin"),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_1st_filtered,group.by = "condition")
+ggsave("1st_run/filtered/OM_seurat_1st_filtered_condition_UMAP.jpg", plot =DimPlot(OM_seurat_1st_filtered,group.by = "condition"),width = 10, height=10,dpi=300)
+
+FeaturePlot(OM_seurat_1st_filtered,features = "percent.mt")
+ggsave("1st_run/filtered/OM_seurat_1st_filtered_percentmt_UMAP.jpg", plot =FeaturePlot(OM_seurat_1st_filtered,features = "percent.mt"),width = 10, height=10,dpi=300)
+
+# cluster_markers_filtered <- FindAllMarkers(KA_seurat_filtered)
+# write.csv(cluster_markers_filtered, file = "KA_seurat_prefiltered_allmarkers.csv", row.names = TRUE)
+# 
+
+```
+
+
+
+```{r 2nd run}
+
+OM_seurat_2nd <- SCTransform(OM_seurat_2nd)
+OM_seurat_2nd <- RunPCA(OM_seurat_2nd, features = VariableFeatures(object = OM_seurat_2nd))
+OM_seurat_2nd <- FindNeighbors(OM_seurat_2nd, dims = 1:20)
+OM_seurat_2nd <- FindClusters(OM_seurat_2nd, resolution = 1)
+OM_seurat_2nd <- RunTSNE(OM_seurat_2nd, dims = 1:20)
+OM_seurat_2nd <- RunUMAP(OM_seurat_2nd, dims = 1:20)
+# saveRDS(OM_seurat_2nd, paste0("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/prefiltering/OM_seurat_2nd_prefiltering_",Sys.Date(),".rds"))
+
+# cluster_markers_prefiltered <- FindAllMarkers(OM_seurat_1st)
+# write.csv(cluster_markers_prefiltered, file = "KA_seurat_prefiltered_allmarkers.csv", row.names = TRUE)
+
+DimPlot(OM_seurat_2nd,label=T)
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/prefiltering/OM_seurat_2nd_prefiltering_clusters_UMAP.jpg", plot =DimPlot(OM_seurat_2nd,label=T),width = 10, height=10,dpi=300)
+DimPlot(OM_seurat_2nd,group.by = "DoubletFinder")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/prefiltering/OM_seurat_2nd_prefiltering_DoubletFinder_UMAP.jpg", plot =DimPlot(OM_seurat_2nd,group.by = "DoubletFinder"),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_2nd,group.by = "sample.origin")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/prefiltering/OM_seurat_2nd_prefiltering_sampleOrigin_UMAP.jpg", plot =DimPlot(OM_seurat_2nd,group.by = "sample.origin"),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_2nd,group.by = "condition")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/prefiltering/OM_seurat_2nd_prefiltering_condition_UMAP.jpg", plot =DimPlot(OM_seurat_2nd,group.by = "condition"),width = 10, height=10,dpi=300)
+
+FeaturePlot(OM_seurat_2nd,features = "percent.mt")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/prefiltering/OM_seurat_2nd_prefiltering_percentmt_UMAP.jpg", plot =FeaturePlot(OM_seurat_2nd,features = "percent.mt"),width = 10, height=10,dpi=300)
+
+
+OM_seurat_2nd_filtered <- subset(OM_seurat_2nd,subset=DoubletFinder=="Singlet")
+# 
+DimPlot(OM_seurat_2nd_filtered,group.by = "DoubletFinder")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/filtered/OM_seurat_2nd_filtered_DoubletFinder_prerunUMAP_UMAP.jpg", plot =DimPlot(OM_seurat_2nd_filtered,group.by = "DoubletFinder"),width = 10, height=10,dpi=300)
+
+OM_seurat_2nd_filtered <- SCTransform(OM_seurat_2nd_filtered,verbose=F)
+OM_seurat_2nd_filtered <- RunPCA(OM_seurat_2nd_filtered, features = VariableFeatures(object = OM_seurat_2nd_filtered))
+OM_seurat_2nd_filtered <- FindNeighbors(OM_seurat_2nd_filtered, dims = 1:20)
+OM_seurat_2nd_filtered <- FindClusters(OM_seurat_2nd_filtered, resolution = 1)
+OM_seurat_2nd_filtered <- RunTSNE(OM_seurat_2nd_filtered, dims = 1:20)
+OM_seurat_2nd_filtered <- RunUMAP(OM_seurat_2nd_filtered, dims = 1:20)
+# saveRDS(OM_seurat_2nd_filtered,paste0("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/filtered/OM_seurat_2nd_filtered_",Sys.Date(),".rds"))
+
+# KA_seurat_filtered[["percent.mt"]] <- PercentageFeatureSet(KA_seurat_filtered, pattern = "^mt-")
+# 
+# 
+DimPlot(OM_seurat_2nd_filtered,label=T)
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/filtered/OM_seurat_2nd_filtered_clusters_UMAP.jpg", plot =DimPlot(OM_seurat_2nd_filtered,label=T),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_2nd_filtered,group.by = "DoubletFinder")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/filtered/OM_seurat_2nd_filtered_DoubletFinder_UMAP.jpg", plot =DimPlot(OM_seurat_2nd_filtered,group.by = "DoubletFinder"),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_2nd_filtered,group.by = "sample.origin")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/filtered/OM_seurat_2nd_filtered_sampleOrigin_UMAP.jpg", plot =DimPlot(OM_seurat_2nd_filtered,group.by = "sample.origin"),width = 10, height=10,dpi=300)
+
+DimPlot(OM_seurat_2nd_filtered,group.by = "condition")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/filtered/OM_seurat_2nd_filtered_condition_UMAP.jpg", plot =DimPlot(OM_seurat_2nd_filtered,group.by = "condition"),width = 10, height=10,dpi=300)
+
+FeaturePlot(OM_seurat_2nd_filtered,features = "percent.mt")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/filtered/OM_seurat_2nd_filtered_percentmt_UMAP.jpg", plot =FeaturePlot(OM_seurat_2nd_filtered,features = "percent.mt"),width = 10, height=10,dpi=300)
+
+# cluster_markers_filtered <- FindAllMarkers(KA_seurat_filtered)
+# write.csv(cluster_markers_filtered, file = "KA_seurat_prefiltered_allmarkers.csv", row.names = TRUE)
+# 
+
+
+```

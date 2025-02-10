@@ -1,0 +1,141 @@
+---
+title: "annotation"
+author: "Javier Villegas"
+date: "2025-01-27"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+library(Seurat)
+library(tidyverse)
+
+```
+
+```{r Using MapMyCells}
+# 
+# ###Filtered dataset
+OM_seurat_1st <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/1st_run/filtered/OM_seurat_1st_filtered.rds")
+#Functions needed for creating the anndata format (if it doesn't work, re-start R to open the python environment)
+library(reticulate)
+version <- "3.9.12"
+install_python(version)
+virtualenv_create("my-environment", version = version)
+use_virtualenv("my-environment")
+
+
+# Transpose data
+dataQCt = Matrix::t(as.matrix(Seurat::GetAssayData(OM_seurat_1st,layer = "counts",assay = "RNA")))
+
+library(anndata)
+# Convert to anndata format
+ad <- AnnData(
+  X = dataQCt,
+  obs = data.frame(group = rownames(dataQCt), row.names = rownames(dataQCt)),
+  var = data.frame(type = colnames(dataQCt), row.names = colnames(dataQCt))
+)
+
+# Write to compressed h5ad file
+write_h5ad(ad,paste0('1st_run/OM_seurat_1st_27_01_2025.h5ad'),compression='gzip')
+
+
+# Check file size. File MUST be <500MB to upload for MapMyCells
+print(paste("Size in MB:",round(file.size("1st_run/OM_seurat_1st_27_01_2025.h5ad")/2^20)))
+
+
+```
+```{r Using MapMyCells}
+# 
+# ###Filtered dataset
+OM_seurat_2nd <- readRDS("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/filtering/2nd_run/filtered/OM_seurat_2nd_filtered_2025-01-27.rds")
+#Functions needed for creating the anndata format (if it doesn't work, re-start R to open the python environment)
+library(reticulate)
+version <- "3.9.12"
+install_python(version)
+virtualenv_create("my-environment", version = version)
+use_virtualenv("my-environment")
+
+
+# Transpose data
+dataQCt = Matrix::t(as.matrix(Seurat::GetAssayData(OM_seurat_2nd,layer = "counts",assay = "RNA")))
+
+library(anndata)
+# Convert to anndata format
+ad <- AnnData(
+  X = dataQCt,
+  obs = data.frame(group = rownames(dataQCt), row.names = rownames(dataQCt)),
+  var = data.frame(type = colnames(dataQCt), row.names = colnames(dataQCt))
+)
+
+# Write to compressed h5ad file
+write_h5ad(ad,paste0('2nd_run/OM_seurat_2nd_27_01_2025.h5ad'),compression='gzip')
+
+
+# Check file size. File MUST be <500MB to upload for MapMyCells
+print(paste("Size in MB:",round(file.size("2nd_run/OM_seurat_2nd_27_01_2025.h5ad")/2^20)))
+
+
+```
+
+
+```{r Adding annotations for 1st run}
+
+# #Read MapMyCells output for KA_seurat_filtered
+mapping_1st <- read.csv("1st_run/OM_seurat_1st_27_01_2025_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1737998247203/OM_seurat_1st_27_01_2025_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1737998247203.csv" ,comment.char="#")
+head(data.frame(mapping_1st))
+# View the top 8 classes
+data.frame(Cell_counts=head(sort(table(mapping_1st$subclass_name),decreasing=T),40))
+
+# What fraction of all cells does these 8 classes represent?
+sum(t(t(head(sort(table(mapping_1st$subclass_name),decreasing=T),20))))/length(mapping_1st$subclass_name)
+
+# Assign rare classes and subclasses as "other"
+mapping_1st$class_new <- mapping_1st$class_name
+mapping_1st$class_new[!is.element(mapping_1st$class_name,names(head(-sort(-table(mapping_1st$class_name)),10)))] = "Gaba neurons"
+mapping_1st$subclass_new <- mapping_1st$subclass_name
+mapping_1st$subclass_new[!is.element(mapping_1st$subclass_name,names(head(-sort(-table(mapping_1st$subclass_name)),30)))] = "other"
+
+OM_seurat_1st <- AddMetaData(OM_seurat_1st,metadata =mapping_1st)
+# KA_seurat <- readRDS("KA_seurat_filtered_annotated.rds")
+
+DimPlot(OM_seurat_1st,group.by = "class_new")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/annotation/1st_run/OM_seurat_1st_types_UMAP.jpg", plot =DimPlot(OM_seurat_1st,group.by = "class_new",label = T),width = 15, height=10,dpi=300)
+
+DimPlot(OM_seurat_1st,group.by = "subclass_new")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/annotation/1st_run/OM_seurat_1st_subtypes_UMAP.jpg", plot =DimPlot(OM_seurat_1st,group.by = "subclass_new",label = T),width = 15, height=10,dpi=300)
+# KA_seurat <- RunUMAP(KA_seurat, dims = 1:10)
+
+saveRDS(OM_seurat_1st,"/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/annotation/1st_run/OM_seurat_1st_annotated_28_01_2025.rds")
+
+```
+
+
+```{r Adding annotations for 2nd run}
+
+# #Read MapMyCells output for KA_seurat_filtered
+mapping_2nd <- read.csv("2nd_run/OM_seurat_2nd_27_01_2025_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1737998657507/OM_seurat_2nd_27_01_2025_10xWholeMouseBrain(CCN20230722)_HierarchicalMapping_UTC_1737998657507.csv",comment.char="#")
+head(data.frame(mapping_2nd))
+# View the top 8 classes
+data.frame(Cell_counts=head(sort(table(mapping_2nd$subclass_name),decreasing=T),40))
+
+# What fraction of all cells does these 8 classes represent?
+sum(t(t(head(sort(table(mapping_2nd$subclass_name),decreasing=T),20))))/length(mapping_2nd$subclass_name)
+
+# Assign rare classes and subclasses as "other"
+mapping_2nd$class_new <- mapping_2nd$class_name
+mapping_2nd$class_new[!is.element(mapping_2nd$class_name,names(head(-sort(-table(mapping_2nd$class_name)),10)))] = "Gaba neurons"
+mapping_2nd$subclass_new <- mapping_2nd$subclass_name
+mapping_2nd$subclass_new[!is.element(mapping_2nd$subclass_name,names(head(-sort(-table(mapping_2nd$subclass_name)),30)))] = "other"
+
+OM_seurat_2nd<- AddMetaData(OM_seurat_2nd,metadata =mapping_2nd)
+# KA_seurat <- readRDS("KA_seurat_filtered_annotated.rds")
+
+DimPlot(OM_seurat_2nd,group.by = "class_new")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/annotation/2nd_run/OM_seurat_2nd_types_UMAP.jpg", plot =DimPlot(OM_seurat_2nd,group.by = "class_new",label = T),width = 15, height=10,dpi=300)
+
+DimPlot(OM_seurat_2nd,group.by = "subclass_new")
+ggsave("/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/annotation/2nd_run/OM_seurat_2nd_subtypes_UMAP.jpg", plot =DimPlot(OM_seurat_2nd,group.by = "subclass_new",label = T),width = 15, height=10,dpi=300)
+# KA_seurat <- RunUMAP(KA_seurat, dims = 1:10)
+
+saveRDS(OM_seurat_2nd,"/media/javi/dat3/JAVI/Cdkl5_Dec/analysis/output/annotation/2nd_run/OM_seurat_2nd_28_01_2025.rds")
+
+```
